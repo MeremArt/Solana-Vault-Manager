@@ -105,8 +105,56 @@ impl<'info> Payment<'info>  {
 
         transfer(transfer_ctx, amount)
     }
+
+
 }
 
+#[derive(Accounts)]
+pub struct Close<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        mut,
+        seeds=[b"vault", state.key().as_ref()],
+        bump=state.vault_bump
+    )]
+    pub vault: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds=[b"state", signer.key().as_ref()],
+        bump=state.state_bump,
+        close = signer
+    )]
+    pub state: Account<'info, VaultState>,
+    pub system_program: Program<'info, System>
+}
+
+impl <'info> Close<'info> {
+    pub fn close(ctx: Context<Close>) -> Result<()> {
+        // Empty out the account first
+        let transfer_accounts = Transfer {
+            from: ctx.accounts.vault.to_account_info(),
+            to: ctx.accounts.signer.to_account_info()
+        };
+
+        let seeds = &[
+            b"vault",
+            ctx.accounts.state.to_account_info().key.as_ref(),
+            &[ctx.accounts.state.vault_bump],
+        ];
+
+        let pda_signer = &[&seeds[..]];
+
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            transfer_accounts,
+            pda_signer
+        );
+
+        transfer(transfer_ctx, ctx.accounts.vault.lamports())
+    }
+    
+}
 #[account]
 pub struct VaultState {
     pub vault_bump: u8,
