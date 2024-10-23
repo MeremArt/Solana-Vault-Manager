@@ -93,6 +93,34 @@ impl<'info> Payment<'info>  {
     
 }
 
+impl <'info> Payment<'info> {
+
+    pub fn withdraw(ctx: Context<Payment>, amount:u64) -> Result<()>  {
+let transfer_account = Transfer{
+    from:ctx.accounts.vault.to_account_info(),
+    to:ctx.accounts.signer.to_account_info()
+};
+
+let seeds = &[
+    b"vault",
+    ctx.accounts.state.to_account_info().key.as_ref(),
+    &[ctx.accounts.state.vault_bump],
+];
+
+
+let pda_signer = &[&seeds[..]];
+
+let transfer_ctx = CpiContext::new_with_signer(
+    ctx.accounts.system_program.to_account_info(),
+    transfer_account,
+    pda_signer,
+);
+
+transfer(transfer_ctx, amount)
+    }
+    
+}
+
 #[account]
 pub struct VaultState{
     pub vault_bump: u8,
