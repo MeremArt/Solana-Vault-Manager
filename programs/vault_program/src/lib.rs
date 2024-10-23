@@ -7,11 +7,23 @@ pub mod vault_program {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.state.vault_bump = *ctx.bumps.get("vault").unwrap();
-        ctx.accounts.state.state_bump = *ctx.bumps.get("state").unwrap();
+        ctx.accounts.initialize(&ctx.bumps)?;
+
         Ok(())
     }
     
+    pub fn deposit (ctx: Context<Payment>, amount:u64)  -> Result<()> {
+
+        let transfer_accounts = Transfer {
+            from:ctx.accounts.signer.to_account_info(),
+            to:ctx.accounts.vault.to_account_info()
+        };
+        let transfer_ctx = CpiContext::new( ctx.accounts.system_program.to_account_info(), 
+        transfer_accounts);
+
+        transfer(transfer_ctx, amount)
+
+    }
   
 }
 
@@ -25,7 +37,8 @@ pub struct Initialize<'info> {
         payer = signer,
         seeds=[b"state", signer.key().as_ref()],
         bump,
-        space = VaultState::LEN
+        space = VaultState::INIT_SPACE,
+
     )]
     pub state: Account<'info, VaultState>,
     #[account(
@@ -36,6 +49,14 @@ pub struct Initialize<'info> {
     pub system_program : Program<'info , System>
 }
 
+impl <'info> Initialize<'info> {
+    
+pub fn initialize(&mut self, bumps: &InitializeBumps) -> Result<()> {
+    self.state.vault_bump = bumps.vault;
+    self.state.state_bump = bumps.state;
+    Ok(())
+}
+}
 
 #[derive(Accounts)]
 pub struct Payment<'info> {
@@ -50,8 +71,26 @@ pub struct Payment<'info> {
 
     #[account(  seeds=[b"state", signer.key().as_ref()],
     bump=state.state_bump)]
+    
     pub state: Account<'info, VaultState>,
     pub system_program: Program<'info, System>
+}
+
+impl<'info> Payment<'info>  {
+    pub fn deposit (ctx: Context<Payment>, amount:u64)  -> Result<()> {
+
+        let transfer_accounts = Transfer {
+            from:ctx.accounts.signer.to_account_info(),
+            to:ctx.accounts.vault.to_account_info()
+        };
+        let transfer_ctx = CpiContext::new( ctx.accounts.system_program.to_account_info(), 
+        transfer_accounts);
+
+        transfer(transfer_ctx, amount)
+
+    }
+  
+    
 }
 
 #[account]
@@ -59,6 +98,6 @@ pub struct VaultState{
     pub vault_bump: u8,
     pub state_bump: u8
 }
-impl VaultState {
-    const LEN: usize = 8 + 1 + 1;
+impl Space for VaultState {
+    const INIT_SPACE: usize = 8 + 1 + 1;
 }
